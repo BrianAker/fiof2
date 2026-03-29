@@ -6,12 +6,12 @@ SHELL := /bin/sh
 
 PROGRAMS := file2dir files2dir
 ZSH_PROGRAMS := $(PROGRAMS)
-PERL_PROGRAMS := folders2dir
+PERL_PROGRAMS := folders2dir nibble
 ZSH_SOURCES := $(addprefix src/,$(addsuffix .zsh,$(ZSH_PROGRAMS)))
 PERL_SOURCES := $(addprefix src/,$(addsuffix .pl,$(PERL_PROGRAMS)))
 SOURCES := $(ZSH_SOURCES) $(PERL_SOURCES)
 BUILT := $(addsuffix .zsh,$(ZSH_PROGRAMS)) $(addsuffix .pl,$(PERL_PROGRAMS))
-TESTS := t/folders2dir.t
+TESTS := t/folders2dir.t t/nibble.t
 
 .PHONY: all build check test install uninstall clean distclean
 
@@ -33,9 +33,10 @@ install: build
 	$(INSTALL) -m 0755 file2dir.zsh "$(DESTDIR)$(BINDIR)/file2dir"
 	$(INSTALL) -m 0755 files2dir.zsh "$(DESTDIR)$(BINDIR)/files2dir"
 	$(INSTALL) -m 0755 folders2dir.pl "$(DESTDIR)$(BINDIR)/folders2dir"
+	$(INSTALL) -m 0755 nibble.pl "$(DESTDIR)$(BINDIR)/nibble"
 
 uninstall:
-	rm -f "$(DESTDIR)$(BINDIR)/file2dir" "$(DESTDIR)$(BINDIR)/files2dir" "$(DESTDIR)$(BINDIR)/folders2dir"
+	rm -f "$(DESTDIR)$(BINDIR)/file2dir" "$(DESTDIR)$(BINDIR)/files2dir" "$(DESTDIR)$(BINDIR)/folders2dir" "$(DESTDIR)$(BINDIR)/nibble"
 
 clean:
 	rm -f $(BUILT)
@@ -51,5 +52,9 @@ files2dir.zsh: src/files2dir.zsh
 	chmod 0755 "$@"
 
 folders2dir.pl: src/folders2dir.pl
+	cp "$<" "$@"
+	chmod 0755 "$@"
+
+nibble.pl: src/nibble.pl
 	cp "$<" "$@"
 	chmod 0755 "$@"
