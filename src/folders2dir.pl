@@ -5,6 +5,7 @@ use warnings;
 
 use File::Basename qw(basename);
 use File::Copy qw(move);
+use File::Find qw(find);
 use File::Path qw(make_path);
 
 my $VERSION = '0.1.0-2026.03.25';
@@ -29,6 +30,9 @@ moved into the destination directory.
 
 If a moved entry would clobber a name already present in the destination, it is
 preserved under DEST/.#backup/SOURCE_DIR/ENTRY instead.
+
+After merging, duplicate backup files are removed when a file with the same
+name and content already exists outside DEST/.#backup.
 
 Options:
   --dry-run              Show what would be done, but do not move anything.
@@ -153,6 +157,101 @@ sub maybe_remove_source_dir {
     });
 }
 
+sub files_match {
+    my ($left, $right) = @_;
+
+    return 0 if basename($left) ne basename($right);
+    return 0 if !-f $left || !-f $right;
+
+    my $left_size = -s $left;
+    my $right_size = -s $right;
+    return 0 if !defined($left_size) || !defined($right_size) || $left_size != $right_size;
+
+    open my $left_fh, '<', $left or die "Failed to open '$left': $!";
+    open my $right_fh, '<', $right or die "Failed to open '$right': $!";
+    binmode($left_fh);
+    binmode($right_fh);
+
+    local $/;
+    my $left_content = <$left_fh>;
+    my $right_content = <$right_fh>;
+
+    close $left_fh or die "Failed to close '$left': $!";
+    close $right_fh or die "Failed to close '$right': $!";
+
+    return $left_content eq $right_content;
+}
+
+sub remove_empty_directories {
+    my ($root) = @_;
+    return if !-d $root;
+
+    my @directories;
+    find({
+        no_chdir => 1,
+        wanted => sub {
+            push @directories, $File::Find::name if -d $File::Find::name;
+        },
+    }, $root);
+
+    for my $dir (sort { length($b) <=> length($a) } @directories) {
+        opendir(my $dh, $dir) or die "Failed to open '$dir': $!";
+        my @entries = grep { $_ ne '.' && $_ ne '..' } readdir($dh);
+        closedir($dh);
+
+        next if @entries;
+
+        run_or_print(qq{rmdir "$dir"}, sub {
+            rmdir($dir) or die "Failed to remove empty directory '$dir': $!";
+        });
+    }
+}
+
+sub cleanup_backup_duplicates {
+    my ($destination) = @_;
+    my $backup_root = "$destination/.#backup";
+    return if !-d $backup_root;
+
+    my %outside_by_name;
+    my @backup_files;
+
+    find({
+        no_chdir => 1,
+        wanted => sub {
+            my $path = $File::Find::name;
+            return if !-f $path;
+
+            if ($path eq $backup_root || index($path, "$backup_root/") == 0) {
+                push @backup_files, $path;
+                return;
+            }
+
+            push @{ $outside_by_name{ basename($path) } }, $path;
+        },
+    }, $destination);
+
+    for my $backup_file (@backup_files) {
+        my $name = basename($backup_file);
+        my $candidates = $outside_by_name{$name} || [];
+        my $is_duplicate = 0;
+
+        for my $outside_file (@{$candidates}) {
+            if (files_match($backup_file, $outside_file)) {
+                $is_duplicate = 1;
+                last;
+            }
+        }
+
+        next if !$is_duplicate;
+
+        run_or_print(qq{rm "$backup_file"}, sub {
+            unlink($backup_file) or die "Failed to remove duplicate backup file '$backup_file': $!";
+        });
+    }
+
+    remove_empty_directories($backup_root);
+}
+
 sub process_prefix {
     my ($raw_prefix) = @_;
     my $prefix = strip_leading_bracket_tag($raw_prefix);
@@ -216,6 +315,8 @@ sub process_prefix {
 
         maybe_remove_source_dir($source_dir);
     }
+
+    cleanup_backup_duplicates($destination);
 }
 
 while (@ARGV) {

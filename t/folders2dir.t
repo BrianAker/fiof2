@@ -68,6 +68,24 @@ subtest 'rolls matching folders into destination and backs up collisions' => sub
     });
 };
 
+subtest 'removes duplicate backup files after merge' => sub {
+    run_in_tempdir('dedupe-backup', sub {
+        write_text('Black One/cover.jpg', "same-cover\n");
+        write_text('Black One/notes.txt', "notes-one\n");
+        write_text('Black Two/cover.jpg', "same-cover\n");
+        write_text('Black Two/scan.txt', "scan-two\n");
+
+        is(run_script('Black'), 0, 'command succeeds');
+
+        ok(-f 'Black/cover.jpg', 'main destination keeps one copy of the conflicting file');
+        is(slurp_text('Black/cover.jpg'), "same-cover\n", 'kept file has expected contents');
+        ok(-f 'Black/notes.txt', 'non-conflicting file from first directory moved');
+        ok(-f 'Black/scan.txt', 'non-conflicting file from second directory moved');
+        ok(!-e 'Black/.#backup/Black Two/cover.jpg', 'duplicate backup file removed');
+        ok(!-d 'Black/.#backup', 'empty backup tree removed after dedupe');
+    });
+};
+
 subtest 'backs up only the conflicting file when merging four directories' => sub {
     run_in_tempdir('partial-conflict-four-way', sub {
         write_text('Archive One/cover.jpg', "cover-one\n");
