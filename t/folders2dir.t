@@ -68,6 +68,39 @@ subtest 'rolls matching folders into destination and backs up collisions' => sub
     });
 };
 
+subtest 'backs up only the conflicting file when merging four directories' => sub {
+    run_in_tempdir('partial-conflict-four-way', sub {
+        write_text('Archive One/cover.jpg', "cover-one\n");
+        write_text('Archive One/liner.txt', "liner-one\n");
+        write_text('Archive Two/cover.jpg', "cover-two\n");
+        write_text('Archive Two/lyrics.txt', "lyrics-two\n");
+        write_text('Archive Three/cover.jpg', "cover-three\n");
+        write_text('Archive Three/credits.txt', "credits-three\n");
+        write_text('Archive Four/cover.jpg', "cover-four\n");
+        write_text('Archive Four/poster.txt', "poster-four\n");
+
+        is(run_script('Archive'), 0, 'command succeeds');
+
+        ok(-f 'Archive/cover.jpg', 'one cover stays in the main destination');
+        is(slurp_text('Archive/cover.jpg'), "cover-four\n", 'main destination keeps the first cover encountered in sort order');
+        ok(-f 'Archive/liner.txt', 'non-conflicting file from Archive One moved into destination');
+        ok(-f 'Archive/lyrics.txt', 'non-conflicting file from Archive Two moved into destination');
+        ok(-f 'Archive/credits.txt', 'non-conflicting file from Archive Three moved into destination');
+        ok(-f 'Archive/poster.txt', 'non-conflicting file from Archive Four moved into destination');
+        ok(-f 'Archive/.#backup/Archive One/cover.jpg', 'Archive One conflicting cover moved to backup');
+        is(slurp_text('Archive/.#backup/Archive One/cover.jpg'), "cover-one\n", 'Archive One backup keeps original content');
+        ok(-f 'Archive/.#backup/Archive Two/cover.jpg', 'Archive Two conflicting cover moved to backup');
+        is(slurp_text('Archive/.#backup/Archive Two/cover.jpg'), "cover-two\n", 'Archive Two backup keeps original content');
+        ok(-f 'Archive/.#backup/Archive Three/cover.jpg', 'third conflicting cover moved to backup');
+        is(slurp_text('Archive/.#backup/Archive Three/cover.jpg'), "cover-three\n", 'third backup keeps original content');
+        ok(!-e 'Archive/.#backup/Archive Four/cover.jpg', 'sort-first directory keeps its cover in the main destination');
+        ok(!-e 'Archive One', 'first source directory removed');
+        ok(!-e 'Archive Two', 'second source directory removed');
+        ok(!-e 'Archive Three', 'third source directory removed');
+        ok(!-e 'Archive Four', 'fourth source directory removed');
+    });
+};
+
 subtest 'default behavior moves child directories too' => sub {
     run_in_tempdir('default-directories', sub {
         write_text('Series One/episode1.mkv', "ep1\n");
