@@ -21,7 +21,7 @@ space-delimited tokens for groups of two or more names.
 Groups must share at least two tokens before they are reported.
 
 Output format:
-  PREFIX<TAB>COUNT
+  COUNT PREFIX
 
 Options:
   --help      Show this help message and exit.
@@ -152,5 +152,5 @@ my @results;
 emit_groups(\@items, \@results);
 
 for my $result (@results) {
-    print "$result->[0]\t$result->[1]\n";
+    print "$result->[1] $result->[0]\n";
 }

@@ -71,7 +71,7 @@ subtest 'groups current directory entries by longest shared token prefix' => sub
         my ($status, $output, $error) = run_script();
         is($status, 0, 'command succeeds');
         is($error, '', 'stderr is empty');
-        is([sort split /\n/, $output], ["Black Show\t2", "Blue Note\t2"], 'reports grouped prefixes and counts');
+        is([sort split /\n/, $output], ["2 Black Show", "2 Blue Note"], 'reports grouped prefixes and counts');
     });
 };
 
@@ -85,7 +85,7 @@ subtest 'uses the first argument as the scan directory' => sub {
         my ($status, $output, $error) = run_script('library');
         is($status, 0, 'command succeeds');
         is($error, '', 'stderr is empty');
-        is($output, "Alpha Series\t2\n", 'scans the requested directory');
+        is($output, "2 Alpha Series\n", 'scans the requested directory');
     });
 };
 
@@ -99,7 +99,7 @@ subtest 'ignores hidden entries when grouping' => sub {
         my ($status, $output, $error) = run_script();
         is($status, 0, 'command succeeds');
         is($error, '', 'stderr is empty');
-        is($output, "Gamma Ray\t2\n", 'hidden entries are ignored');
+        is($output, "2 Gamma Ray\n", 'hidden entries are ignored');
     });
 };
 
@@ -115,7 +115,7 @@ subtest 'prefers the shared word sequence and ignores one-word overlaps' => sub 
         my ($status, $output, $error) = run_script();
         is($status, 0, 'command succeeds');
         is($error, '', 'stderr is empty');
-        is($output, "One Fish Two\t3\n", 'reports the longest shared token sequence for the multi-name group');
+        is($output, "3 One Fish Two\n", 'reports the longest shared token sequence for the multi-name group');
     });
 };
 

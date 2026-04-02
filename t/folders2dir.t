@@ -85,6 +85,53 @@ subtest 'default behavior moves child directories too' => sub {
     });
 };
 
+subtest 'rolls up both files and child directories from matching source folders' => sub {
+    run_in_tempdir('mixed-entries', sub {
+        write_text('Concert.txt', "top-level-file\n");
+        write_text('Concert One/track01.flac', "track-one\n");
+        write_text('Concert One/art/cover.jpg', "cover-one\n");
+        write_text('Concert Two/track02.flac', "track-two\n");
+        write_text('Concert Two/photos/live.jpg', "live-two\n");
+
+        is(run_script('Concert'), 0, 'command succeeds');
+
+        ok(-f 'Concert/track01.flac', 'file from first source folder moved');
+        ok(-f 'Concert/track02.flac', 'file from second source folder moved');
+        ok(-d 'Concert/art', 'child directory from first source folder moved');
+        ok(-f 'Concert/art/cover.jpg', 'first moved child directory keeps contents');
+        ok(-d 'Concert/photos', 'child directory from second source folder moved');
+        ok(-f 'Concert/photos/live.jpg', 'second moved child directory keeps contents');
+        ok(-f 'Concert.txt', 'top-level matching file is left in place');
+        is(slurp_text('Concert.txt'), "top-level-file\n", 'top-level matching file is unchanged');
+        ok(!-e 'Concert One', 'first source folder removed after roll-up');
+        ok(!-e 'Concert Two', 'second source folder removed after roll-up');
+    });
+};
+
+subtest 'include-files rolls up matching top-level files too' => sub {
+    run_in_tempdir('mixed-entries-include-files', sub {
+        write_text('Concert.txt', "top-level-file\n");
+        write_text('Concert One/track01.flac', "track-one\n");
+        write_text('Concert One/art/cover.jpg', "cover-one\n");
+        write_text('Concert Two/track02.flac', "track-two\n");
+        write_text('Concert Two/photos/live.jpg', "live-two\n");
+
+        is(run_script('--include-files', 'Concert'), 0, 'command succeeds');
+
+        ok(-f 'Concert/Concert.txt', 'top-level matching file moved into destination');
+        is(slurp_text('Concert/Concert.txt'), "top-level-file\n", 'moved top-level file keeps contents');
+        ok(-f 'Concert/track01.flac', 'file from first source folder moved');
+        ok(-f 'Concert/track02.flac', 'file from second source folder moved');
+        ok(-d 'Concert/art', 'child directory from first source folder moved');
+        ok(-f 'Concert/art/cover.jpg', 'first moved child directory keeps contents');
+        ok(-d 'Concert/photos', 'child directory from second source folder moved');
+        ok(-f 'Concert/photos/live.jpg', 'second moved child directory keeps contents');
+        ok(!-e 'Concert.txt', 'top-level matching file removed from current directory');
+        ok(!-e 'Concert One', 'first source folder removed after roll-up');
+        ok(!-e 'Concert Two', 'second source folder removed after roll-up');
+    });
+};
+
 subtest 'year suffix and bracket tag normalization work together' => sub {
     run_in_tempdir('year-tag', sub {
         write_text('[HD] Black One/poster.jpg', "poster\n");
