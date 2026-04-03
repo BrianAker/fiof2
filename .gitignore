@@ -1,4 +1,5 @@
 file2dir.zsh
-files2dir.zsh
+/files2dir.pl
+/files2dir.zsh
 folders2dir.pl
 /nibble.pl

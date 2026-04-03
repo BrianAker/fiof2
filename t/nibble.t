@@ -78,8 +78,8 @@ subtest 'groups current directory entries by longest shared token prefix' => sub
 subtest 'uses the first argument as the scan directory' => sub {
     run_in_tempdir('argument-dir', sub {
         make_dir('library');
-        write_text('library/[TV] Alpha Series One.avi', "one\n");
-        write_text('library/[TV] Alpha Series Two.avi', "two\n");
+        write_text('library/(2020) [TV] Alpha Series One.avi', "one\n");
+        write_text('library/(2020) [TV] Alpha Series Two.avi', "two\n");
         write_text('library/Beta.dat', "beta\n");
 
         my ($status, $output, $error) = run_script('library');

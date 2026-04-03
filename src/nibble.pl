@@ -18,6 +18,9 @@ Before grouping, a leading "[...]" tag and any spaces after it are removed from
 each name. The script then prints the longest shared prefixes measured in whole
 space-delimited tokens for groups of two or more names.
 
+If a name begins with a leading "(...)" tag followed by a "[...]" tag, both
+prefixes and any following spaces are ignored before grouping.
+
 Groups must share at least two tokens before they are reported.
 
 Output format:
@@ -29,9 +32,9 @@ Options:
 EOF
 }
 
-sub normalize_name {
-    my ($text) = @_;
-    return $text if !defined($text) || $text eq '' || substr($text, 0, 1) ne '[';
+sub balanced_suffix {
+    my ($text, $open, $close) = @_;
+    return undef if !defined($text) || $text eq '' || substr($text, 0, 1) ne $open;
 
     my $depth = 1;
     my $i = 1;
@@ -39,22 +42,47 @@ sub normalize_name {
 
     while ($i < $len) {
         my $ch = substr($text, $i, 1);
-        if ($ch eq '[') {
+        if ($ch eq $open) {
             $depth++;
-        } elsif ($ch eq ']') {
+        } elsif ($ch eq $close) {
             $depth--;
             if ($depth == 0) {
-                my $rest = substr($text, $i + 1);
-                $rest =~ s/\A\s+//;
-                $rest =~ s/\A +//;
-                $rest =~ s/ +\z//;
-                return $rest;
+                return substr($text, $i + 1);
             }
         }
         $i++;
     }
 
-    die "Error: unbalanced leading bracket tag in '$text'.\n";
+    return undef;
+}
+
+sub normalize_name {
+    my ($text) = @_;
+    my $original = $text;
+
+    if (defined($text) && $text ne '' && substr($text, 0, 1) eq '(') {
+        my $after_paren = balanced_suffix($text, '(', ')');
+        if (defined $after_paren) {
+            $after_paren =~ s/\A\s+//;
+            if (substr($after_paren, 0, 1) eq '[') {
+                $text = $after_paren;
+            } else {
+                return $original;
+            }
+        } else {
+            return $original;
+        }
+    }
+
+    return $text if !defined($text) || $text eq '' || substr($text, 0, 1) ne '[';
+
+    my $after_bracket = balanced_suffix($text, '[', ']');
+    die "Error: unbalanced leading bracket tag in '$text'.\n" if !defined $after_bracket;
+
+    $after_bracket =~ s/\A\s+//;
+    $after_bracket =~ s/\A +//;
+    $after_bracket =~ s/ +\z//;
+    return $after_bracket;
 }
 
 sub read_entries {

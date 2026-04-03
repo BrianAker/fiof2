@@ -11,7 +11,7 @@ use File::Path qw(make_path);
 my $VERSION = '0.1.0-2026.03.25';
 
 my $dry_run = 0;
-my $include_files = 0;
+my $include_files = 1;
 my $year_suffix = '';
 
 sub print_usage {
@@ -25,6 +25,9 @@ directory named PREFIX.
 Matching ignores a leading "[...]" tag and any spaces after it, and is
 case-insensitive.
 
+If a name begins with a leading "(...)" tag followed by a "[...]" tag, both
+prefixes and any following spaces are ignored.
+
 Immediate child files and directories from each matched source directory are
 moved into the destination directory.
 
@@ -37,7 +40,8 @@ name and content already exists outside DEST/.#backup.
 Options:
   --dry-run              Show what would be done, but do not move anything.
   --include-files        Also roll up matching top-level files from the current
-                         directory.
+                         directory. This is the default.
+  --no-include-files     Leave matching top-level files in place.
   --year Y               Append year or year-range to created directory name,
                          e.g. "Foo (2004)" or "Foo (2001-2012)".
   --help                 Show this help message and exit.
@@ -70,9 +74,9 @@ sub validate_year_arg {
     return 0;
 }
 
-sub strip_leading_bracket_tag {
-    my ($text) = @_;
-    return $text if !defined($text) || $text eq '' || substr($text, 0, 1) ne '[';
+sub balanced_suffix {
+    my ($text, $open, $close) = @_;
+    return undef if !defined($text) || $text eq '' || substr($text, 0, 1) ne $open;
 
     my $depth = 1;
     my $i = 1;
@@ -80,20 +84,45 @@ sub strip_leading_bracket_tag {
 
     while ($i < $len) {
         my $ch = substr($text, $i, 1);
-        if ($ch eq '[') {
+        if ($ch eq $open) {
             $depth++;
-        } elsif ($ch eq ']') {
+        } elsif ($ch eq $close) {
             $depth--;
             if ($depth == 0) {
-                my $rest = substr($text, $i + 1);
-                $rest =~ s/\A\s+//;
-                return $rest;
+                return substr($text, $i + 1);
             }
         }
         $i++;
     }
 
-    return $text;
+    return undef;
+}
+
+sub strip_leading_bracket_tag {
+    my ($text) = @_;
+    my $original = $text;
+
+    if (defined($text) && $text ne '' && substr($text, 0, 1) eq '(') {
+        my $after_paren = balanced_suffix($text, '(', ')');
+        if (defined $after_paren) {
+            $after_paren =~ s/\A\s+//;
+            if (substr($after_paren, 0, 1) eq '[') {
+                $text = $after_paren;
+            } else {
+                return $original;
+            }
+        } else {
+            return $original;
+        }
+    }
+
+    return $text if !defined($text) || $text eq '' || substr($text, 0, 1) ne '[';
+
+    my $after_bracket = balanced_suffix($text, '[', ']');
+    return $original if !defined $after_bracket;
+
+    $after_bracket =~ s/\A\s+//;
+    return $after_bracket;
 }
 
 sub run_or_print {
@@ -328,6 +357,11 @@ while (@ARGV) {
     }
     if ($arg eq '--include-files') {
         $include_files = 1;
+        shift @ARGV;
+        next;
+    }
+    if ($arg eq '--no-include-files') {
+        $include_files = 0;
         shift @ARGV;
         next;
     }
