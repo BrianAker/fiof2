@@ -4,10 +4,14 @@ use warnings;
 use Cwd qw(getcwd abs_path);
 use File::Path qw(make_path);
 use File::Temp qw(tempdir);
+use IPC::Open3 qw(open3);
+use Symbol qw(gensym);
 use Test2::V0;
 
 my $repo_root = abs_path(getcwd());
 my $script = "$repo_root/src/files2dir.pl";
+my $nibble = "$repo_root/src/nibble.pl";
+my $perl = $^X;
 
 sub write_text {
     my ($path, $content) = @_;
@@ -53,6 +57,27 @@ sub run_script {
     return $status >> 8;
 }
 
+sub run_pipeline {
+    my ($producer, $consumer) = @_;
+
+    my $stderr = gensym();
+    my $command = qq{$perl "$producer" --null | $perl "$consumer" --null};
+    my $pid = open3(undef, my $stdout, $stderr, '/bin/sh', '-c', $command);
+
+    my $out = do {
+        local $/;
+        <$stdout>;
+    };
+    my $err = do {
+        local $/;
+        <$stderr>;
+    };
+
+    waitpid($pid, 0);
+    my $status = $? >> 8;
+    return ($status, $out, $err);
+}
+
 subtest 'prefix mode strips a leading parenthetical before bracket tag' => sub {
     run_in_tempdir('prefix-normalization', sub {
         write_text('(1964) [TV] Black One.mkv', "one\n");
@@ -94,6 +119,24 @@ subtest 'prefix matching is case-insensitive after stripping the leading tag' =>
         ok(-f 'De of bar/[foo] De of Bar Primera.txt', 'mixed-case first file matched');
         ok(-f 'De of bar/[foo] De of bar CERO.txt', 'lowercase second file matched');
         ok(-f 'De of bar/[foo] De of bar SEGUNDA.txt', 'lowercase third file matched');
+    });
+};
+
+subtest 'null mode can consume prefixes from nibble' => sub {
+    run_in_tempdir('null-pipeline', sub {
+        write_text('Black Show One.mkv', "one\n");
+        write_text('Black Show Two.srt', "two\n");
+        write_text('Blue Note One.txt', "three\n");
+        write_text('Blue Note Two.jpg', "four\n");
+
+        my ($status, $output, $error) = run_pipeline($nibble, $script);
+        is($status, 0, 'pipeline succeeds');
+        is($output, '', 'stdout is empty');
+        is($error, '', 'stderr is empty');
+        ok(-f 'Black Show/Black Show One.mkv', 'first nibble prefix fed into files2dir');
+        ok(-f 'Black Show/Black Show Two.srt', 'second matching file moved');
+        ok(-f 'Blue Note/Blue Note One.txt', 'third file moved under second prefix');
+        ok(-f 'Blue Note/Blue Note Two.jpg', 'fourth file moved under second prefix');
     });
 };
 

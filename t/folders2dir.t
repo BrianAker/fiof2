@@ -4,10 +4,14 @@ use warnings;
 use Cwd qw(getcwd abs_path);
 use File::Path qw(make_path);
 use File::Temp qw(tempdir);
+use IPC::Open3 qw(open3);
+use Symbol qw(gensym);
 use Test2::V0;
 
 my $repo_root = abs_path(getcwd());
 my $script = "$repo_root/src/folders2dir.pl";
+my $nibble = "$repo_root/src/nibble.pl";
+my $perl = $^X;
 
 sub write_text {
     my ($path, $content) = @_;
@@ -46,6 +50,27 @@ sub run_script {
     my (@args) = @_;
     my $status = system('perl', $script, @args);
     return $status >> 8;
+}
+
+sub run_pipeline {
+    my ($producer, $consumer) = @_;
+
+    my $stderr = gensym();
+    my $command = qq{$perl "$producer" --null | $perl "$consumer" --null};
+    my $pid = open3(undef, my $stdout, $stderr, '/bin/sh', '-c', $command);
+
+    my $out = do {
+        local $/;
+        <$stdout>;
+    };
+    my $err = do {
+        local $/;
+        <$stderr>;
+    };
+
+    waitpid($pid, 0);
+    my $status = $? >> 8;
+    return ($status, $out, $err);
 }
 
 subtest 'rolls matching folders into destination and backs up collisions' => sub {
@@ -133,6 +158,28 @@ subtest 'default behavior moves child directories too' => sub {
         ok(-f 'Series/extras/interview.txt', 'child directory contents preserved');
         ok(!-e 'Series One', 'source directory removed after moving contents');
         ok(!-e 'Series Two', 'second source directory removed after moving contents');
+    });
+};
+
+subtest 'null mode can consume prefixes from nibble' => sub {
+    run_in_tempdir('null-pipeline', sub {
+        write_text('Black Show One/episode1.mkv', "one\n");
+        write_text('Black Show Two/episode2.mkv', "two\n");
+        write_text('Blue Note One/track1.txt', "three\n");
+        write_text('Blue Note Two/track2.txt', "four\n");
+
+        my ($status, $output, $error) = run_pipeline($nibble, $script);
+        is($status, 0, 'pipeline succeeds');
+        is($output, '', 'stdout is empty');
+        is($error, '', 'stderr is empty');
+        ok(-f 'Black Show/episode1.mkv', 'first nibble prefix fed into folders2dir');
+        ok(-f 'Black Show/episode2.mkv', 'second matching directory rolled up');
+        ok(-f 'Blue Note/track1.txt', 'third file rolled up under second prefix');
+        ok(-f 'Blue Note/track2.txt', 'fourth file rolled up under second prefix');
+        ok(!-e 'Black Show One', 'first source directory removed');
+        ok(!-e 'Black Show Two', 'second source directory removed');
+        ok(!-e 'Blue Note One', 'third source directory removed');
+        ok(!-e 'Blue Note Two', 'fourth source directory removed');
     });
 };
 

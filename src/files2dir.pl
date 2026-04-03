@@ -12,6 +12,7 @@ my $VERSION = '1.7.0-2026.04.02';
 my $force = 0;
 my $dry_run = 0;
 my $include_directories = 0;
+my $read_null_arguments = 0;
 my $year_suffix = q{};
 
 sub print_usage {
@@ -40,6 +41,8 @@ If ARG is an existing file with an extension:
   X.ext into that directory.
 
 Options:
+  -0, --null             Read additional ARG values from stdin as NUL-delimited
+                         strings.
   --force                Overwrite existing files in the target directory.
                          (Does not overwrite existing directories; those are skipped.)
   --dry-run              Show what would be done, but do not move anything.
@@ -126,6 +129,24 @@ sub run_or_print {
     }
 
     $code->();
+}
+
+sub read_null_arguments {
+    my $stdin = q{};
+    binmode(STDIN);
+    while (1) {
+        my $chunk = q{};
+        my $read = sysread(STDIN, $chunk, 8192);
+        die "Failed to read stdin: $!" if !defined $read;
+        last if $read == 0;
+        $stdin .= $chunk;
+    }
+
+    return () if $stdin eq q{};
+
+    my @items = split /\0/, $stdin, -1;
+    pop @items if @items && $items[-1] eq q{};
+    return grep { $_ ne q{} } @items;
 }
 
 sub ensure_directory {
@@ -273,6 +294,11 @@ while (@ARGV) {
         shift @ARGV;
         next;
     }
+    if ($arg eq '-0' || $arg eq '--null') {
+        $read_null_arguments = 1;
+        shift @ARGV;
+        next;
+    }
     if ($arg eq '--dry-run') {
         $dry_run = 1;
         shift @ARGV;
@@ -309,6 +335,8 @@ while (@ARGV) {
     }
     last;
 }
+
+push @ARGV, read_null_arguments() if $read_null_arguments;
 
 die "Error: missing ARG.\nUse --help for usage.\n" if !@ARGV;
 

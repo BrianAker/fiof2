@@ -89,6 +89,20 @@ subtest 'uses the first argument as the scan directory' => sub {
     });
 };
 
+subtest 'null mode emits prefixes only for piping to other tools' => sub {
+    run_in_tempdir('null-output', sub {
+        write_text('Black Show One.mkv', "one\n");
+        write_text('Black Show Two.srt', "two\n");
+        write_text('Blue Note One.txt', "three\n");
+        write_text('Blue Note Two.txt', "four\n");
+
+        my ($status, $output, $error) = run_script('--null');
+        is($status, 0, 'command succeeds');
+        is($error, '', 'stderr is empty');
+        is($output, "Black Show\0Blue Note\0", 'outputs prefixes as NUL-delimited strings');
+    });
+};
+
 subtest 'ignores hidden entries when grouping' => sub {
     run_in_tempdir('hidden', sub {
         write_text('.hidden-one', "x\n");

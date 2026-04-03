@@ -5,6 +5,7 @@ use warnings;
 
 my $VERSION = '0.1.0-2026.03.25';
 my $MIN_SHARED_TOKENS = 2;
+my $null_output = 0;
 
 sub print_usage {
     print <<'EOF';
@@ -27,6 +28,8 @@ Output format:
   COUNT PREFIX
 
 Options:
+  -0, --null  Print prefixes only, separated by NUL bytes for piping into
+              prefix-consuming tools.
   --help      Show this help message and exit.
   --version   Show version and exit.
 EOF
@@ -161,6 +164,11 @@ sub emit_groups {
 
 while (@ARGV) {
     my $arg = $ARGV[0];
+    if ($arg eq '-0' || $arg eq '--null') {
+        $null_output = 1;
+        shift @ARGV;
+        next;
+    }
     if ($arg eq '--help') {
         print_usage();
         exit 0;
@@ -182,5 +190,9 @@ my @results;
 emit_groups(\@items, \@results);
 
 for my $result (@results) {
-    print "$result->[1] $result->[0]\n";
+    if ($null_output) {
+        print "$result->[0]\0";
+    } else {
+        print "$result->[1] $result->[0]\n";
+    }
 }

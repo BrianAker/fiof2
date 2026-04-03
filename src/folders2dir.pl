@@ -12,6 +12,7 @@ my $VERSION = '0.1.0-2026.03.25';
 
 my $dry_run = 0;
 my $include_files = 1;
+my $read_null_arguments = 0;
 my $year_suffix = '';
 
 sub print_usage {
@@ -38,6 +39,8 @@ After merging, duplicate backup files are removed when a file with the same
 name and content already exists outside DEST/.#backup.
 
 Options:
+  -0, --null             Read additional PREFIX values from stdin as
+                         NUL-delimited strings.
   --dry-run              Show what would be done, but do not move anything.
   --include-files        Also roll up matching top-level files from the current
                          directory. This is the default.
@@ -132,6 +135,24 @@ sub run_or_print {
         return;
     }
     $code->();
+}
+
+sub read_null_arguments {
+    my $stdin = '';
+    binmode(STDIN);
+    while (1) {
+        my $chunk = '';
+        my $read = sysread(STDIN, $chunk, 8192);
+        die "Failed to read stdin: $!" if !defined $read;
+        last if $read == 0;
+        $stdin .= $chunk;
+    }
+
+    return () if $stdin eq '';
+
+    my @items = split /\0/, $stdin, -1;
+    pop @items if @items && $items[-1] eq '';
+    return grep { $_ ne '' } @items;
 }
 
 sub ensure_directory {
@@ -350,6 +371,11 @@ sub process_prefix {
 
 while (@ARGV) {
     my $arg = $ARGV[0];
+    if ($arg eq '-0' || $arg eq '--null') {
+        $read_null_arguments = 1;
+        shift @ARGV;
+        next;
+    }
     if ($arg eq '--dry-run') {
         $dry_run = 1;
         shift @ARGV;
@@ -391,6 +417,8 @@ while (@ARGV) {
     }
     last;
 }
+
+push @ARGV, read_null_arguments() if $read_null_arguments;
 
 die "Error: missing PREFIX.\nUse --help for usage.\n" if !@ARGV;
 
