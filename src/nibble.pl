@@ -116,15 +116,17 @@ sub common_prefix_length {
     return 0 if @{$items} < 2;
 
     my @reference = @{ $items->[0]{tokens} };
+    my @reference_lc = map { lc($_) } @reference;
     my $common = scalar @reference;
 
     for my $item (@{$items}[1 .. $#{$items}]) {
         my @tokens = @{ $item->{tokens} };
+        my @tokens_lc = map { lc($_) } @tokens;
         $common = @tokens if @tokens < $common;
 
         my $i = 0;
         while ($i < $common) {
-            last if $reference[$i] ne $tokens[$i];
+            last if $reference_lc[$i] ne $tokens_lc[$i];
             $i++;
         }
         $common = $i;
@@ -147,7 +149,7 @@ sub emit_groups {
     my %buckets;
     for my $item (@{$items}) {
         next if @{ $item->{tokens} } <= $shared;
-        my $next = $item->{tokens}[$shared];
+        my $next = lc($item->{tokens}[$shared]);
         push @{ $buckets{$next} }, $item;
     }
 

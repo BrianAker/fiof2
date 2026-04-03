@@ -119,6 +119,19 @@ subtest 'prefers the shared word sequence and ignores one-word overlaps' => sub 
     });
 };
 
+subtest 'stripping the leading tag still compares tokens case-insensitively' => sub {
+    run_in_tempdir('case-insensitive-tokens', sub {
+        write_text('[foo] De of Bar Primera', "a\n");
+        write_text('[foo] De of bar CERO', "b\n");
+        write_text('[foo] De of bar SEGUNDA', "c\n");
+
+        my ($status, $output, $error) = run_script();
+        is($status, 0, 'command succeeds');
+        is($error, '', 'stderr is empty');
+        is($output, "3 De of Bar\n", 'shared token prefix ignores token case');
+    });
+};
+
 subtest 'throws an error for an unbalanced leading bracket tag' => sub {
     run_in_tempdir('unbalanced-tag', sub {
         write_text('[broken Name One', "a\n");

@@ -82,6 +82,21 @@ subtest 'include-directories also uses the normalized prefix' => sub {
     });
 };
 
+subtest 'prefix matching is case-insensitive after stripping the leading tag' => sub {
+    run_in_tempdir('case-insensitive-prefix', sub {
+        write_text('[foo] De of Bar Primera.txt', "primera\n");
+        write_text('[foo] De of bar CERO.txt', "cero\n");
+        write_text('[foo] De of bar SEGUNDA.txt', "segunda\n");
+
+        is(run_script('[foo] De of bar'), 0, 'command succeeds');
+
+        ok(-d 'De of bar', 'destination directory uses normalized prefix text');
+        ok(-f 'De of bar/[foo] De of Bar Primera.txt', 'mixed-case first file matched');
+        ok(-f 'De of bar/[foo] De of bar CERO.txt', 'lowercase second file matched');
+        ok(-f 'De of bar/[foo] De of bar SEGUNDA.txt', 'lowercase third file matched');
+    });
+};
+
 subtest 'file mode still creates a directory from the file stem' => sub {
     run_in_tempdir('file-mode', sub {
         write_text('Episode 01.mkv', "episode\n");

@@ -136,6 +136,24 @@ subtest 'default behavior moves child directories too' => sub {
     });
 };
 
+subtest 'prefix matching is case-insensitive after stripping the leading tag' => sub {
+    run_in_tempdir('case-insensitive-prefix', sub {
+        write_text('[foo] De of Bar Primera/chapter.txt', "primera\n");
+        write_text('[foo] De of bar CERO/intro.txt', "cero\n");
+        write_text('[foo] De of bar SEGUNDA/outro.txt', "segunda\n");
+
+        is(run_script('[foo] De of bar'), 0, 'command succeeds');
+
+        ok(-d 'De of bar', 'destination directory uses normalized prefix text');
+        ok(-f 'De of bar/chapter.txt', 'mixed-case first directory matched');
+        ok(-f 'De of bar/intro.txt', 'lowercase second directory matched');
+        ok(-f 'De of bar/outro.txt', 'lowercase third directory matched');
+        ok(!-e '[foo] De of Bar Primera', 'first source directory removed');
+        ok(!-e '[foo] De of bar CERO', 'second source directory removed');
+        ok(!-e '[foo] De of bar SEGUNDA', 'third source directory removed');
+    });
+};
+
 subtest 'default behavior rolls up matching top-level files and child directories' => sub {
     run_in_tempdir('mixed-entries', sub {
         write_text('Concert.txt', "top-level-file\n");
