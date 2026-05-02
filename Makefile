@@ -5,13 +5,13 @@ INSTALL ?= install
 SHELL := /bin/sh
 
 ZSH_PROGRAMS := file2dir
-PERL_PROGRAMS := files2dir folders2dir nibble
+PERL_PROGRAMS := files2dir folders2dir merge2 nibble
 ZSH_SOURCES := $(addprefix src/,$(addsuffix .zsh,$(ZSH_PROGRAMS)))
 PERL_SOURCES := $(addprefix src/,$(addsuffix .pl,$(PERL_PROGRAMS)))
 SOURCES := $(ZSH_SOURCES) $(PERL_SOURCES)
 BUILT := $(addsuffix .zsh,$(ZSH_PROGRAMS)) $(addsuffix .pl,$(PERL_PROGRAMS))
 LEGACY_BUILT := files2dir.zsh
-TESTS := t/files2dir.t t/folders2dir.t t/nibble.t
+TESTS := t/files2dir.t t/folders2dir.t t/merge2.t t/nibble.t
 
 .PHONY: all build check test install uninstall clean distclean
 
@@ -33,10 +33,11 @@ install: build
 	$(INSTALL) -m 0755 file2dir.zsh "$(DESTDIR)$(BINDIR)/file2dir"
 	$(INSTALL) -m 0755 files2dir.pl "$(DESTDIR)$(BINDIR)/files2dir"
 	$(INSTALL) -m 0755 folders2dir.pl "$(DESTDIR)$(BINDIR)/folders2dir"
+	$(INSTALL) -m 0755 merge2.pl "$(DESTDIR)$(BINDIR)/merge2"
 	$(INSTALL) -m 0755 nibble.pl "$(DESTDIR)$(BINDIR)/nibble"
 
 uninstall:
-	rm -f "$(DESTDIR)$(BINDIR)/file2dir" "$(DESTDIR)$(BINDIR)/files2dir" "$(DESTDIR)$(BINDIR)/folders2dir" "$(DESTDIR)$(BINDIR)/nibble"
+	rm -f "$(DESTDIR)$(BINDIR)/file2dir" "$(DESTDIR)$(BINDIR)/files2dir" "$(DESTDIR)$(BINDIR)/folders2dir" "$(DESTDIR)$(BINDIR)/merge2" "$(DESTDIR)$(BINDIR)/nibble"
 
 clean:
 	rm -f $(BUILT) $(LEGACY_BUILT)
@@ -52,6 +53,10 @@ files2dir.pl: src/files2dir.pl
 	chmod 0755 "$@"
 
 folders2dir.pl: src/folders2dir.pl
+	cp "$<" "$@"
+	chmod 0755 "$@"
+
+merge2.pl: src/merge2.pl
 	cp "$<" "$@"
 	chmod 0755 "$@"
 
