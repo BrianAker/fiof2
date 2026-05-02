@@ -3,8 +3,9 @@
 use strict;
 use warnings;
 
+use Errno qw(EXDEV);
 use File::Basename qw(basename);
-use File::Copy qw(move);
+use File::Copy qw(copy);
 
 my $VERSION = '0.1.0-2026.05.02';
 
@@ -54,10 +55,76 @@ sub contains_only_directories {
     return 1;
 }
 
+sub copy_file {
+    my ($source, $destination) = @_;
+    copy($source, $destination)
+      or die "Failed to copy '$source' to '$destination': $!";
+
+    my @stat = stat($source);
+    chmod($stat[2] & 07777, $destination)
+      or die "Failed to set permissions on '$destination': $!"
+      if @stat;
+}
+
+sub copy_directory_tree {
+    my ($source, $destination) = @_;
+
+    mkdir($destination) or die "Failed to create directory '$destination': $!";
+    my @source_stat = stat($source);
+
+    for my $entry (read_entries($source)) {
+        my $source_child = "$source/$entry";
+        my $destination_child = "$destination/$entry";
+
+        if (-d $source_child) {
+            copy_directory_tree($source_child, $destination_child);
+            next;
+        }
+
+        if (-f $source_child) {
+            copy_file($source_child, $destination_child);
+            next;
+        }
+
+        die "Unsupported entry type at '$source_child'.\n";
+    }
+
+    chmod($source_stat[2] & 07777, $destination)
+      or die "Failed to set permissions on '$destination': $!"
+      if @source_stat;
+}
+
+sub remove_directory_tree {
+    my ($source) = @_;
+
+    for my $entry (read_entries($source)) {
+        my $child = "$source/$entry";
+
+        if (-d $child) {
+            remove_directory_tree($child);
+            next;
+        }
+
+        unlink($child) or die "Failed to remove file '$child': $!";
+    }
+
+    rmdir($source) or die "Failed to remove directory '$source': $!";
+}
+
 sub move_directory {
     my ($source, $destination) = @_;
-    move($source, $destination)
-      or die "Failed to move '$source' to '$destination': $!";
+
+    if (!$ENV{MERGE2_FORCE_COPY}) {
+        return if rename($source, $destination);
+
+        my $rename_errno = 0 + $!;
+        my $rename_error = "$!";
+        die "Failed to move '$source' to '$destination': $rename_error"
+          if $rename_errno != EXDEV;
+    }
+
+    copy_directory_tree($source, $destination);
+    remove_directory_tree($source);
 }
 
 sub backup_path {

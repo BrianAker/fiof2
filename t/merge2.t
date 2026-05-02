@@ -150,4 +150,26 @@ subtest 'backs up a deeper collision when the target child is not a directory' =
     });
 };
 
+subtest 'copy fallback handles regular moves and backup moves across filesystems' => sub {
+    run_in_tempdir('forced-copy-fallback', sub {
+        make_dir('Target/B');
+        write_text('Target/B/kept.txt', "kept\n");
+        write_text('B/incoming.txt', "backup-me\n");
+        write_text('C/plain.txt', "plain\n");
+
+        local $ENV{MERGE2_FORCE_COPY} = 1;
+        is(run_script('B', 'C', 'Target'), 0, 'command succeeds');
+
+        ok(-d 'Target/B.bak', 'colliding source is copied into backup path');
+        ok(-f 'Target/B.bak/incoming.txt', 'backup copy keeps contents');
+        is(slurp_text('Target/B.bak/incoming.txt'), "backup-me\n", 'backup file contents preserved');
+        ok(-d 'Target/C', 'non-colliding source is copied into the target');
+        ok(-f 'Target/C/plain.txt', 'plain copied directory keeps contents');
+        is(slurp_text('Target/C/plain.txt'), "plain\n", 'plain copied file contents preserved');
+        ok(!-e 'B', 'backup-moved source removed from original location');
+        ok(!-e 'C', 'plain-moved source removed from original location');
+        ok(-f 'Target/B/kept.txt', 'original target directory remains untouched');
+    });
+};
+
 done_testing;
